@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wessels Quote Graphic Generator</title>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #0b1020;
+      color: #fff;
+    }
+
+    .wrap {
+      max-width: 1800px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+    }
+
+    .panel,
+    .preview {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 18px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+    }
+
+    .sub {
+      font-size: 14px;
+      opacity: 0.85;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .field input,
+    .field textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 12px;
+      font: inherit;
+      outline: none;
+    }
+
+    .field textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .btn {
+      cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      padding: 11px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+      opacity: 0.85;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+
+    .error {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #ffb4b4;
+      white-space: pre-wrap;
+    }
+
+    .preview {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .previewTitle {
+      font-size: 14px;
+      opacity: 0.85;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: #111;
+      display: block;
+    }
+
+    @media (max-width: 1100px) {
+      .wrap {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1>Wessels Quote Graphic Generator</h1>
+      <div class="sub">
+        Upload a photo, enter the text, preview it live, and export a PNG.
+      </div>
+
+      <div class="field">
+        <label for="photo">Photo</label>
+        <input id="photo" type="file" accept="image/*" />
+      </div>
+
+      <div class="field">
+        <label for="nameText">Name</label>
+        <input id="nameText" type="text" maxlength="42" placeholder="JOHN SMITH" />
+      </div>
+
+      <div class="field">
+        <label for="quoteText">Quote</label>
+        <textarea id="quoteText" maxlength="260" placeholder="Robert Wessels is the leader Maine needs."></textarea>
+      </div>
+
+      <div class="field">
+        <label for="sloganText">Bottom Statement</label>
+        <input id="sloganText" type="text" maxlength="80" placeholder="LEADERSHIP FOR MAINE" />
+      </div>
+
+      <div class="row">
+        <button id="downloadBtn" class="btn" disabled>Download PNG</button>
+        <button id="resetBtn" class="btn" type="button">Reset</button>
+      </div>
+
+      <div id="status" class="status">Load a photo to begin.</div>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div class="preview">
+      <div class="previewTitle">Preview</div>
+      <canvas id="canvas" width="2048" height="1365"></canvas>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const TEMPLATE_SRC = "template.png";
+      const WIDTH = 2048;
+      const HEIGHT = 1365;
+
+      const LAYOUT = {
+        photo: {
+          x: 99,
+          y: 627,
+          w: 404,
+          h: 440
+        },
+
+        name: {
+          x: 660,
+          y: 790,
+          maxWidth: 760,
+          font: 'italic 900 78px Arial Black, Arial, sans-serif',
+          fillStyle: '#ffffff',
+          align: 'left',
+          baseline: 'middle',
+          shadowColor: 'rgba(0,0,0,0.30)',
+          shadowBlur: 6,
+          shadowOffsetX: 0,
+          shadowOffsetY: 3
+        },
+
+        quote: {
+          x: 1025,
+          y: 910,
+          boxWidth: 980,
+          maxLines: 4,
+          fontSize: 58,
+          minFontSize: 30,
+          lineHeight: 1.18,
+          fontWeight: 700,
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'italic',
+          fillStyle: '#ffffff',
+          align: 'center',
+          baseline: 'middle',
+          shadowColor: 'rgba(0,0,0,0.24)',
+          shadowBlur: 4,
+          shadowOffsetX: 0,
+          shadowOffsetY: 2
+        },
+
+        slogan: {
+          x: 120,
+          y: 1180,
+          maxWidth: 1250,
+          font: 'italic 900 58px Arial Black, Arial, sans-serif',
+          fillStyle: '#ffffff',
+          align: 'left',
+          baseline: 'middle',
+          shadowColor: 'rgba(0,0,0,0.24)',
+          shadowBlur: 3,
+          shadowOffsetX: 0,
+          shadowOffsetY: 2
+        }
+      };
+
+      const canvas = document.getElementById("canvas");
+      const ctx = canvas.getContext("2d");
+
+      const elPhoto = document.getElementById("photo");
+      const elName = document.getElementById("nameText");
+      const elQuote = document.getElementById("quoteText");
+      const elSlogan = document.getElementById("sloganText");
+      const elDownloadBtn = document.getElementById("downloadBtn");
+      const elResetBtn = document.getElementById("resetBtn");
+      const elStatus = document.getElementById("status");
+      const elError = document.getElementById("error");
+
+      let templateImg = null;
+      let portraitImg = null;
+      let lastBlobUrl = null;
+      let renderToken = 0;
+
+      function setStatus(msg) {
+        elStatus.textContent = msg || "";
+      }
+
+      function setError(msg) {
+        elError.textContent = msg || "";
+      }
+
+      function revokeLastBlob() {
+        if (lastBlobUrl) {
+          URL.revokeObjectURL(lastBlobUrl);
+          lastBlobUrl = null;
+        }
+      }
+
+      function loadImage(src) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error(`Could not load ${src}`));
+          img.src = src;
+        });
+      }
+
+      function readFileAsImage(file) {
+        return new Promise((resolve, reject) => {
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+
+          img.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(img);
+          };
+
+          img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("That photo could not be opened."));
+          };
+
+          img.src = url;
+        });
+      }
+
+      function canvasToBlob(canvas, type = "image/png") {
+        return new Promise((resolve, reject) => {
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("PNG export failed."));
+          }, type);
+        });
+      }
+
+      function drawCover(img, dx, dy, dw, dh) {
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+
+        const scale = Math.max(dw / iw, dh / ih);
+        const sw = dw / scale;
+        const sh = dh / scale;
+        const sx = (iw - sw) / 2;
+        const sy = (ih - sh) / 2;
+
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+      }
+
+      function drawSimpleText(text, cfg) {
+        const value = String(text || "").trim();
+        if (!value) return;
+
+        ctx.save();
+        ctx.font = cfg.font;
+        ctx.fillStyle = cfg.fillStyle;
+        ctx.textAlign = cfg.align;
+        ctx.textBaseline = cfg.baseline;
+
+        if (cfg.shadowColor) {
+          ctx.shadowColor = cfg.shadowColor;
+          ctx.shadowBlur = cfg.shadowBlur || 0;
+          ctx.shadowOffsetX = cfg.shadowOffsetX || 0;
+          ctx.shadowOffsetY = cfg.shadowOffsetY || 0;
+        }
+
+        ctx.fillText(value, cfg.x, cfg.y, cfg.maxWidth);
+        ctx.restore();
+      }
+
+      function breakLongToken(token, maxWidth) {
+        const parts = [];
+        let current = "";
+
+        for (const ch of token) {
+          const test = current + ch;
+          if (ctx.measureText(test).width <= maxWidth || current.length === 0) {
+            current = test;
+          } else {
+            parts.push(current);
+            current = ch;
+          }
+        }
+
+        if (current) parts.push(current);
+        return parts;
+      }
+
+      function wrapTextSmart(text, maxWidth) {
+        const paragraphs = String(text || "")
+          .replace(/\r/g, "")
+          .split("\n");
+
+        const lines = [];
+
+        for (const paragraph of paragraphs) {
+          const trimmed = paragraph.trim();
+
+          if (!trimmed) {
+            lines.push("");
+            continue;
+          }
+
+          const rawWords = trimmed.split(/\s+/);
+          const words = [];
+
+          for (const word of rawWords) {
+            if (ctx.measureText(word).width <= maxWidth) {
+              words.push(word);
+            } else {
+              words.push(...breakLongToken(word, maxWidth));
+            }
+          }
+
+          let line = "";
+
+          for (const word of words) {
+            const test = line ? `${line} ${word}` : word;
+
+            if (ctx.measureText(test).width <= maxWidth) {
+              line = test;
+            } else {
+              if (line) lines.push(line);
+              line = word;
+            }
+          }
+
+          if (line) lines.push(line);
+        }
+
+        return lines;
+      }
+
+      function fitParagraph(text, cfg) {
+        let size = cfg.fontSize;
+
+        while (size >= cfg.minFontSize) {
+          ctx.font = `${cfg.fontStyle} ${cfg.fontWeight} ${size}px ${cfg.fontFamily}`;
+          const lines = wrapTextSmart(text, cfg.boxWidth);
+
+          if (lines.length <= cfg.maxLines) {
+            return { size, lines };
+          }
+
+          size -= 2;
+        }
+
+        ctx.font = `${cfg.fontStyle} ${cfg.fontWeight} ${cfg.minFontSize}px ${cfg.fontFamily}`;
+        let lines = wrapTextSmart(text, cfg.boxWidth).slice(0, cfg.maxLines);
+
+        if (lines.length) {
+          let last = lines[lines.length - 1];
+          while (ctx.measureText(last + "…").width > cfg.boxWidth && last.length > 0) {
+            last = last.slice(0, -1);
+          }
+          lines[lines.length - 1] = last + "…";
+        }
+
+        return { size: cfg.minFontSize, lines };
+      }
+
+      function drawParagraph(text, cfg) {
+        const value = String(text || "").trim();
+        if (!value) return;
+
+        const fitted = fitParagraph(value, cfg);
+        const lineHeightPx = fitted.size * cfg.lineHeight;
+        const totalHeight = fitted.lines.length * lineHeightPx;
+        const startY = cfg.y - totalHeight / 2 + lineHeightPx / 2;
+
+        ctx.save();
+        ctx.font = `${cfg.fontStyle} ${cfg.fontWeight} ${fitted.size}px ${cfg.fontFamily}`;
+        ctx.fillStyle = cfg.fillStyle;
+        ctx.textAlign = cfg.align;
+        ctx.textBaseline = "middle";
+
+        if (cfg.shadowColor) {
+          ctx.shadowColor = cfg.shadowColor;
+          ctx.shadowBlur = cfg.shadowBlur || 0;
+          ctx.shadowOffsetX = cfg.shadowOffsetX || 0;
+          ctx.shadowOffsetY = cfg.shadowOffsetY || 0;
+        }
+
+        fitted.lines.forEach((line, i) => {
+          ctx.fillText(line, cfg.x, startY + i * lineHeightPx);
+        });
+
+        ctx.restore();
+      }
+
+      async function render() {
+        const token = ++renderToken;
+        setError("");
+        elDownloadBtn.disabled = true;
+
+        try {
+          if (!templateImg) {
+            setStatus("Loading template...");
+            templateImg = await loadImage(TEMPLATE_SRC);
+          }
+
+          if (token !== renderToken) return;
+
+          ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+          // Photo first, so the transparent hole in quote.png reveals it.
+          if (portraitImg) {
+            const p = LAYOUT.photo;
+            drawCover(portraitImg, p.x, p.y, p.w, p.h);
+          }
+
+          // Template on top.
+          ctx.drawImage(templateImg, 0, 0, WIDTH, HEIGHT);
+
+          // Text on top of everything.
+          drawSimpleText(elName.value.toUpperCase(), LAYOUT.name);
+          drawParagraph(elQuote.value, LAYOUT.quote);
+          drawSimpleText(elSlogan.value.toUpperCase(), LAYOUT.slogan);
+
+          const blob = await canvasToBlob(canvas, "image/png");
+          if (token !== renderToken) return;
+
+          revokeLastBlob();
+          lastBlobUrl = URL.createObjectURL(blob);
+          elDownloadBtn.disabled = false;
+          setStatus("Preview ready.");
+        } catch (err) {
+          if (token !== renderToken) return;
+          setError(err.message || String(err));
+          setStatus("Rendering failed.");
+        }
+      }
+
+      function downloadImage() {
+        if (!lastBlobUrl) return;
+        const a = document.createElement("a");
+        a.href = lastBlobUrl;
+        a.download = "wessels-quote.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      function resetForm() {
+        elPhoto.value = "";
+        elName.value = "";
+        elQuote.value = "";
+        elSlogan.value = "";
+        portraitImg = null;
+        render();
+      }
+
+      elPhoto.addEventListener("change", async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        try {
+          portraitImg = await readFileAsImage(file);
+          await render();
+        } catch (err) {
+          portraitImg = null;
+          setError(err.message || String(err));
+        }
+      });
+
+      [elName, elQuote, elSlogan].forEach((el) => {
+        el.addEventListener("input", render);
+      });
+
+      elDownloadBtn.addEventListener("click", downloadImage);
+      elResetBtn.addEventListener("click", resetForm);
+      window.addEventListener("beforeunload", revokeLastBlob);
+
+      render();
+    })();
+  </script>
+</body>
+</html>
